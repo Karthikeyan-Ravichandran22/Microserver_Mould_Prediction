@@ -11,15 +11,34 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import pickle
+import os
+
+# Load the trained model and scaler
 
 # 2. Create the app object
 app = FastAPI()
+import pickle
 
-# Load the trained model and scaler
+# Update these paths to the absolute paths of your pickle files
 model_path = 'trained_random_forest_classifier.pkl'
 scaler_path = 'trained_scaler.pkl'
-classifier = pickle.load(open(model_path, "rb"))
-scaler = pickle.load(open(scaler_path, "rb"))
+
+# Test loading the model
+try:
+    with open(model_path, 'rb') as file:
+        model = pickle.load(file)
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f"Failed to load model: {e}")
+
+# Test loading the scaler
+try:
+    with open(scaler_path, 'rb') as file:
+        scaler = pickle.load(file)
+    print("Scaler loaded successfully.")
+except Exception as e:
+    print(f"Failed to load scaler: {e}")
+
 
 # Define a Pydantic model for the input data structure
 class PredictionInput(BaseModel):
