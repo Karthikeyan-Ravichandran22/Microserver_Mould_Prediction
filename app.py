@@ -1,71 +1,66 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 17 21:40:41 2020
-
 @author: win10
 """
 
-# 1. Library imports
+# Library imports
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, parse_obj_as
 import pandas as pd
-import pickle
+import joblib
 import os
 
-# Load the trained model and scaler
-
-# 2. Create the app object
+# Create the app object
 app = FastAPI()
-import pickle
 
-# Update these paths to the absolute paths of your pickle files
+# Load the trained model, scaler, and schema
 model_path = 'trained_random_forest_classifier.pkl'
 scaler_path = 'trained_scaler.pkl'
+schema_path = 'data_schema.pkl'
 
-# Test loading the model
-try:
-    with open(model_path, 'rb') as file:
-        model = pickle.load(file)
-    print("Model loaded successfully.")
-except Exception as e:
-    print(f"Failed to load model: {e}")
+model = joblib.load(model_path)
+scaler = joblib.load(scaler_path)
+schema = joblib.load(schema_path)
 
-# Test loading the scaler
-try:
-    with open(scaler_path, 'rb') as file:
-        scaler = pickle.load(file)
-    print("Scaler loaded successfully.")
-except Exception as e:
-    print(f"Failed to load scaler: {e}")
+# Function to prepare and make predictions
+def prepare_and_predict(input_df, model, scaler, schema):
+    # Prepare input DataFrame for prediction
+    input_df_encoded = pd.get_dummies(input_df)
+    missing_cols = set(schema) - set(input_df_encoded.columns)
+    for c in missing_cols:
+        input_df_encoded[c] = 0
+    input_df_aligned = input_df_encoded.reindex(columns=schema, fill_value=0)
 
+    # Scale the features and make predictions
+    input_df_scaled = scaler.transform(input_df_aligned)
+    predictions = model.predict(input_df_scaled)
+    input_df['Predictions'] = predictions
+    return input_df
 
-# Define a Pydantic model for the input data structure
-class PredictionInput(BaseModel):
-    width: float
-    length: float
-    floor_area: float
-    window_width: float
-    window_height: float
-    provided_purge: float
-    required_purge: float
+# Define a Pydantic model for the DataFrame structure
+class DataFrameInput(BaseModel):
+    data: list
+    columns: list
 
-# 3. Index route, opens automatically on http://127.0.0.1:8000
-@app.get('/')
-def index():
-    return {'message': 'Hello, welcome to the prediction service'}
-
-# 4. Prediction endpoint
-@app.post('/predict')
-def make_prediction(input_data: PredictionInput):
+@app.post('/predict_dataframe/')
+def predict_dataframe(input: DataFrameInput):
     try:
-        input_df = pd.DataFrame([input_data.dict()])
-        input_df_scaled = scaler.transform(input_df)
-        prediction = classifier.predict(input_df_scaled)
-        return {"prediction": prediction.tolist()[0]}
+        # Convert the input to a DataFrame
+        input_df = pd.DataFrame(input.data, columns=input.columns)
+
+        # Make predictions and get output DataFrame
+        output_df = prepare_and_predict(input_df, model, scaler, schema)
+        return output_df.to_dict(orient='records')
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 5. Run the API with uvicorn
+# Index route
+@app.get('/')
+def index():
+    return {'message': 'Welcome to the prediction service'}
+
+# Run the API with uvicorn
 if __name__ == '__main__':
     uvicorn.run(app, host='127.0.0.1', port=8000)
