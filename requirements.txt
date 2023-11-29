@@ -1,6 +1,10 @@
-fastapi==0.68.0
-uvicorn==0.15.0
-pydantic==1.8.2
-numpy==1.19.5
+numpy
+scipy
+scikit-learn
+matplotlib
 pandas
-joblib==1.0.1
+fastapi
+uvicorn
+gunicorn==19.9.0
+uvloop
+httptools
