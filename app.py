@@ -73,6 +73,12 @@ FastAPI app to handle predictions using a trained model.
 """
 
 # Library imports
+# -*- coding: utf-8 -*-
+"""
+FastAPI app to handle predictions using a trained model.
+"""
+
+# Library imports
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File
 import pandas as pd
@@ -82,9 +88,9 @@ from io import StringIO
 app = FastAPI()
 
 # Load the trained model, scaler, and schema
-model_path = 'trained_random_forest_classifier.pkl'
-scaler_path = 'trained_scaler.pkl'
-schema_path = 'data_schema.pkl'  # Path to the schema file
+model_path = 'path/to/trained_random_forest_classifier.pkl'
+scaler_path = 'path/to/trained_scaler.pkl'
+schema_path = 'path/to/data_schema.pkl'  # Path to the schema file
 
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
@@ -108,9 +114,10 @@ def prepare_and_predict(input_df, model, scaler, schema):
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...)):
     try:
-        # Read the file into a DataFrame
+        # Stream file into DataFrame
         content = await file.read()
-        input_df = pd.read_csv(StringIO(content.decode('utf-8')))
+        stream = StringIO(content.decode('utf-8'))
+        input_df = pd.read_csv(stream)
 
         # Making predictions
         predictions = prepare_and_predict(input_df, model, scaler, schema)
@@ -127,9 +134,8 @@ def read_root():
 
 # Run the API with uvicorn
 if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=8000)  # Adjust the host and port as needed
+    uvicorn.run(app, host='0.0.0.0', port=8000, limit_concurrency=5, limit_max_requests=100, timeout_keep_alive=120)  # Adjust the host and port as needed
 
-    
 # #  Run the post API
 # # curl -X POST http://127.0.0.1:8000/use_existing_dataframe/
 # # curl -X POST https://microserver-1dfc53516aa1.herokuapp.com/use_existing_dataframe/
