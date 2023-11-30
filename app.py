@@ -88,9 +88,9 @@ from io import StringIO
 app = FastAPI()
 
 # Load the trained model, scaler, and schema
-model_path = 'path/to/trained_random_forest_classifier.pkl'
-scaler_path = 'path/to/trained_scaler.pkl'
-schema_path = 'path/to/data_schema.pkl'  # Path to the schema file
+model_path = 'trained_random_forest_classifier.pkl'
+scaler_path = 'trained_scaler.pkl'
+schema_path = 'data_schema.pkl'  # Path to the schema file
 
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
