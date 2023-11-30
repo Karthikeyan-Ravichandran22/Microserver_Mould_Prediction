@@ -1,8 +1,8 @@
-# # -*- coding: utf-8 -*-
-# """
-# Created on Tue Nov 17 21:40:41 2020
-# @author: win10
-# """
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Nov 17 21:40:41 2020
+@author: win10
+"""
 
 # # Library imports
 # import uvicorn
@@ -66,72 +66,70 @@
 #     uvicorn.run(app, host='127.0.0.1', port=8000)
 
 # -----    with csv 
-
-# -*- coding: utf-8 -*-
+# Library imports
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov 17 21:40:41 2020
-@author: win10
+FastAPI app to handle predictions using a trained model.
 """
 
 # Library imports
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 import pandas as pd
 import joblib
+from io import StringIO
 
-# Create the app object
 app = FastAPI()
 
 # Load the trained model, scaler, and schema
 model_path = 'trained_random_forest_classifier.pkl'
 scaler_path = 'trained_scaler.pkl'
-schema_path = 'data_schema.pkl'
+schema_path = 'data_schema.pkl'  # Path to the schema file
 
-
-output =pd.read_csv("output.csv")
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
-schema = joblib.load(schema_path)
-
-# Assume 'output' DataFrame is already defined and accessible here
-# Example: output = pd.DataFrame(...)
+schema = joblib.load(schema_path)  # Loading the schema
 
 # Function to prepare and make predictions
 def prepare_and_predict(input_df, model, scaler, schema):
+    # Align input DataFrame with the schema
     input_df_encoded = pd.get_dummies(input_df)
-    missing_cols = set(schema) - set(input_df_encoded.columns)
-    for c in missing_cols:
-        input_df_encoded[c] = 0
-    input_df_aligned = input_df_encoded.reindex(columns=schema, fill_value=0)
-    input_df_scaled = scaler.transform(input_df_aligned)
+    for col in set(schema) - set(input_df_encoded.columns):
+        input_df_encoded[col] = 0
+    input_df_encoded = input_df_encoded[schema]
+
+    # Scale the features
+    input_df_scaled = scaler.transform(input_df_encoded)
+
+    # Predicting
     predictions = model.predict(input_df_scaled)
-    input_df['Predictions'] = predictions
-    return input_df
+    return predictions
 
-@app.post('/use_existing_dataframe/')
-def use_existing_dataframe():
+@app.post("/predict/")
+async def predict(file: UploadFile = File(...)):
     try:
-        # Use the existing 'output' DataFrame for predictions
-        global output
-        output_with_predictions = prepare_and_predict(output, model, scaler, schema)
+        # Read the file into a DataFrame
+        content = await file.read()
+        input_df = pd.read_csv(StringIO(content.decode('utf-8')))
 
-        # Save to CSV
-        output_file_path = 'predicted_output.csv'
-        output_with_predictions.to_csv(output_file_path, index=False)
+        # Making predictions
+        predictions = prepare_and_predict(input_df, model, scaler, schema)
 
-        return {"message": "Predictions made and saved to CSV", "file_path": output_file_path}
+        # Adding predictions to the DataFrame
+        input_df['Predictions'] = predictions
+        return input_df.to_dict(orient='records')
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Index route
-@app.get('/')
-def index():
-    return {'message': 'Welcome to the prediction service'}
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the prediction API"}
 
 # Run the API with uvicorn
 if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=8000)  # Adjust the host and port as needed
 
-#  Run the post API
-# curl -X POST http://127.0.0.1:8000/use_existing_dataframe/
+    
+# #  Run the post API
+# # curl -X POST http://127.0.0.1:8000/use_existing_dataframe/
+# # curl -X POST https://microserver-1dfc53516aa1.herokuapp.com/use_existing_dataframe/
